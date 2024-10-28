@@ -1,4 +1,11 @@
-ANTHROPIC_API_KEY = "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"
-GOOGLE_DOC_ID = '12WQmBWkBTtx8Ac0-LXClOthRxNBFMgEmERGr6LarQw8'
-FOLDER_ID = '1pWq2YQ1iSjA_xQHRMKu4e57jzpdURIK2'
-OPENAI_API_KEY = "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"  
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Cargar variables de entorno desde el archivo .env
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+GOOGLE_DOC_ID = os.getenv("GOOGLE_DOC_ID")
+FOLDER_ID = os.getenv("FOLDER_ID")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+api_key = os.getenv('OPENAI_API_KEY')
