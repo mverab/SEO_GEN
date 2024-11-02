@@ -7,13 +7,13 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.errors import HttpError
-from config import ANTHROPIC_API_KEY, GOOGLE_DOC_ID, FOLDER_ID
+from config import ANTHROPIC_API_KEY, GOOGLE_DOC_ID, FOLDER_ID, FEATURE_FLAGS
 import numpy as np
 from openai import OpenAI
 from config import OPENAI_API_KEY
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-client = anthropic.Client(api_key=ANTHROPIC_API_KEY)
+anthropic_client = anthropic.Client(api_key=ANTHROPIC_API_KEY)
 
 # Primero, actualizar la inicialización de OpenAI
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -27,6 +27,9 @@ def read_file(filename):
         sys.exit(1)
 
 def get_relevant_links(keyword, links_file, num_links=3):
+    if not FEATURE_FLAGS['USE_INTERNAL_LINKS']:
+        return []
+
     try:
         if not os.path.exists(links_file):
             print(f"El archivo {links_file} no existe.")
@@ -98,8 +101,11 @@ def get_perplexity_data(keyword):
 def generate_seo_content(topic, title, keyword, secondary_keywords, external_link, perplexity_data, relevant_links):
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _generate_seo_content():
-        # Formatear los enlaces internos
-        internal_links_formatted = '\n'.join([f"- [{link['Descripción']}]({link['URL']})" for link in relevant_links]) if relevant_links else "No hay enlaces internos disponibles."
+        # Formatear los enlaces internos solo si están activados
+        internal_links_section = ""
+        if FEATURE_FLAGS['USE_INTERNAL_LINKS']:
+            internal_links_formatted = '\n'.join([f"- [{link['Descripción']}]({link['URL']})" for link in relevant_links]) if relevant_links else "No hay enlaces internos disponibles."
+            internal_links_section = f"\n5. Enlaces internos disponibles:\n{internal_links_formatted}"
 
         # Leer el archivo de tono
         tone_file = read_file('tone.txt')
@@ -112,25 +118,27 @@ Genera contenido en español siguiendo estrictamente estas reglas:
 1. Título: {title}
 2. Palabra clave principal: {keyword}
 3. Palabras clave secundarias: {', '.join(secondary_keywords)}
-4. Enlace externo: [{external_link}]({external_link})
-5. Enlaces internos disponibles:\n{internal_links_formatted}
+4. Enlace externo: [{external_link}]({external_link}){internal_links_section}
 6. Datos de referencia: {perplexity_data}
 
 El contenido debe tener 600 palabras mínimo, usar los enlaces de forma natural y mantener el tono especificado."""
 
         # Actualizar la llamada a Claude 3.5 Sonnet
-        response = client.messages.create(
-            model="claude-3-sonnet-20240229",
-            max_tokens=4000,
-            messages=[{
-                "role": "user",
-                "content": prompt
-            }]
-        )
-        
-        if hasattr(response, 'content'):
-            return response.content[0].text if isinstance(response.content, list) else response.content
-        return str(response)
+        try:
+            response = anthropic_client.messages.create(
+                model="claude-3-sonnet-20240229",
+                max_tokens=4000,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+            if hasattr(response, 'content'):
+                return response.content[0].text if isinstance(response.content, list) else response.content
+            return str(response)
+        except Exception as e:
+            print(f"Error al generar contenido: {str(e)}")
+            return None
 
     try:
         return _generate_seo_content()
@@ -318,6 +326,10 @@ def main():
     if not check_google_credentials():
         sys.exit(1)
     
+    # Añadir opción para activar/desactivar enlaces internos
+    activate_links = input("¿Deseas incluir enlaces internos? (s/n): ").lower().strip() == 's'
+    FEATURE_FLAGS['USE_INTERNAL_LINKS'] = activate_links
+    
     topic = validate_input("Ingresa el tópico de la información de la cual eres experto: ")
     title = validate_input("Ingresa el título del artículo: ")
     keyword = validate_input("Ingresa la palabra clave principal: ")
@@ -325,7 +337,12 @@ def main():
     secondary_keywords = [kw.strip() for kw in secondary_keywords_input.split(',') if kw.strip()]
     external_link = validate_input("Ingresa el enlace externo: ")
 
-    relevant_links = get_relevant_links(keyword, "links_appsclavitud.csv", num_links=3)
+    # Solo buscar enlaces internos si está activada la función
+    relevant_links = []
+    if FEATURE_FLAGS['USE_INTERNAL_LINKS']:
+        print("Buscando enlaces internos relevantes...")
+        relevant_links = get_relevant_links(keyword, "links_appsclavitud.csv", num_links=3)
+
     perplexity_data = get_perplexity_data(keyword)
 
     print("Generando contenido SEO...")
