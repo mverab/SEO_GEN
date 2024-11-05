@@ -12,11 +12,17 @@ import numpy as np
 from openai import OpenAI
 from config import OPENAI_API_KEY
 from tenacity import retry, stop_after_attempt, wait_exponential
+from perplexity import Client
+from datetime import datetime
 
 anthropic_client = anthropic.Client(api_key=ANTHROPIC_API_KEY)
 
 # Primero, actualizar la inicialización de OpenAI
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Configuración de Perplexity
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
+perplexity_client = Client(api_key=PERPLEXITY_API_KEY)
 
 def read_file(filename):
     try:
@@ -89,14 +95,27 @@ def cosine_similarity(a, b):
     b = np.array(b)
     return np.dot(a, b.T) / (np.linalg.norm(a, axis=1, keepdims=True) * np.linalg.norm(b, axis=1))
 
-def get_perplexity_data(keyword):
-    filename = "perplexity_data.txt"
-    if os.path.exists(filename):
-        with open(filename, 'r', encoding='utf-8') as file:
-            return file.read().strip()
-    else:
-        print(f"Archivo {filename} no encontrado. Créalo y añade los datos de Perplexity.")
-        return ""
+def get_perplexity_research(keyword, secondary_keywords):
+    """
+    Realiza investigación usando Perplexity API
+    """
+    try:
+        # Construir prompt para investigación
+        prompt = f"""Investiga y proporciona información detallada sobre:
+        Tema principal: {keyword}
+        Temas secundarios: {', '.join(secondary_keywords)}
+        
+        Proporciona información actualizada y verificable."""
+
+        response = perplexity_client.chat.completions.create(
+            model="llama-3.1-sonar-large-128k-online",  
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error en investigación Perplexity: {e}")
+        return None
 
 def generate_seo_content(topic, title, keyword, secondary_keywords, external_link, perplexity_data, relevant_links):
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -322,6 +341,38 @@ Por favor:
         return False
     return True
 
+def process_article_batch(csv_file):
+    """
+    Procesa lote de artículos desde CSV
+    """
+    try:
+        df = pd.read_csv(csv_file)
+        for _, row in df.iterrows():
+            article_id = f"{datetime.now().strftime('%Y%m%d')}_{row['id']}"
+            
+            # Obtener investigación de Perplexity
+            research_data = get_perplexity_research(
+                row['keyword'],
+                row['secondary_keywords'].split(',')
+            )
+            
+            if research_data:
+                # Generar contenido con Claude usando los datos de Perplexity
+                content = generate_seo_content(
+                    row['topic'],
+                    row['title'], 
+                    row['keyword'],
+                    row['secondary_keywords'].split(','),
+                    research_data,
+                    get_relevant_links(row['keyword'])
+                )
+                
+                # Guardar con ID único
+                save_to_google_docs(content, f"{row['title']}_{article_id}")
+                
+    except Exception as e:
+        print(f"Error procesando lote: {e}")
+
 def main():
     if not check_google_credentials():
         sys.exit(1)
@@ -343,7 +394,7 @@ def main():
         print("Buscando enlaces internos relevantes...")
         relevant_links = get_relevant_links(keyword, "links_appsclavitud.csv", num_links=3)
 
-    perplexity_data = get_perplexity_data(keyword)
+    perplexity_data = get_perplexity_research(keyword, secondary_keywords)
 
     print("Generando contenido SEO...")
     seo_content = generate_seo_content(topic, title, keyword, secondary_keywords, external_link, perplexity_data, relevant_links)
