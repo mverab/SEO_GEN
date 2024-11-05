@@ -2,7 +2,6 @@ from typing import Dict, List
 import asyncio
 from datetime import datetime
 import pandas as pd
-from perplexity import Client
 import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging

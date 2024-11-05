@@ -7,6 +7,7 @@ from config import LOG_CONFIG, BATCH_CONFIG
 import pandas as pd
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
+from internal_links_service import InternalLinksService
 
 # Configurar logging
 logging.basicConfig(
@@ -20,15 +21,39 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+class RateLimiter:
+    def __init__(self, calls_per_minute: int = 20):  # Perplexity permite 20 llamadas/min
+        self.calls_per_minute = calls_per_minute
+        self.calls = []
+        self.lock = asyncio.Lock()
+        
+    async def acquire(self):
+        async with self.lock:
+            now = datetime.now()
+            # Limpiar llamadas antiguas
+            self.calls = [call_time for call_time in self.calls 
+                         if (now - call_time).seconds < 60]
+            
+            if len(self.calls) >= self.calls_per_minute:
+                # Esperar hasta que podamos hacer otra llamada
+                wait_time = 60 - (now - self.calls[0]).seconds
+                if wait_time > 0:
+                    logger.info(f"Rate limit alcanzado. Esperando {wait_time} segundos")
+                    await asyncio.sleep(wait_time)
+                self.calls = self.calls[1:]
+            
+            self.calls.append(now)
+
 class PerplexityResearchService:
-    def __init__(self, perplexity_api_key: str, anthropic_api_key: str):
+    def __init__(self, perplexity_api_key: str, anthropic_api_key: str, openai_api_key: str):
         """Inicializa el servicio de investigación"""
-        # Inicializar cliente de Perplexity usando OpenAI client
         self.perplexity_client = OpenAI(
             api_key=perplexity_api_key,
             base_url="https://api.perplexity.ai"
         )
         self.anthropic_client = anthropic.Client(api_key=anthropic_api_key)
+        self.internal_links = InternalLinksService(openai_api_key)
+        self.rate_limiter = RateLimiter()
 
     def _build_perplexity_prompt(self, keyword: str, secondary_keywords: List[str]) -> str:
         """
@@ -55,26 +80,40 @@ Please give your response in fluid spanish, 40% spartan tone, casual."""
     async def get_research_data(
         self, 
         article_data: Dict,
-        tone_file: str
+        tone_file: str,
+        links_file: str = "links_appsclavitud.csv"
     ) -> Optional[Dict]:
-        """
-        Obtiene datos de investigación usando Perplexity y genera contenido con Claude
-        """
+        """Obtiene datos de investigación y genera contenido con enlaces internos"""
         try:
-            # Investigación con Perplexity
-            prompt = self._build_perplexity_prompt(
-                article_data["keyword"],
-                article_data["secondary_keywords"]
+            # Cargar enlaces internos
+            self.internal_links.load_links(links_file)
+            
+            # Obtener enlaces relevantes
+            relevant_links = await self.internal_links.find_relevant_links(
+                article_data["keyword"]
             )
-            research_data = await self._call_perplexity_api(prompt)
+            
+            # Obtener investigación con Perplexity
+            research_data = await self._call_perplexity_api(
+                self._build_perplexity_prompt(
+                    article_data["keyword"],
+                    article_data["secondary_keywords"]
+                )
+            )
 
             if not research_data:
                 logger.error(f"No se obtuvo respuesta de Perplexity para artículo {article_data['id']}")
                 return None
 
             logger.info(f"Investigación completada para artículo {article_data['id']}")
-
-            # Generar contenido con Claude usando los datos de Perplexity
+            
+            # Formatear enlaces para el prompt
+            formatted_links = [
+                self.internal_links.format_link_for_content(link)
+                for link in relevant_links
+            ]
+            
+            # Generar contenido con Claude incluyendo enlaces
             content_response = await self.anthropic_client.messages.create(
                 model="claude-3-sonnet-20240229",
                 max_tokens=4000,
@@ -83,7 +122,8 @@ Please give your response in fluid spanish, 40% spartan tone, casual."""
                     "content": self._build_content_prompt(
                         article_data,
                         research_data,
-                        tone_file
+                        tone_file,
+                        formatted_links
                     )
                 }]
             )
@@ -92,6 +132,7 @@ Please give your response in fluid spanish, 40% spartan tone, casual."""
                 "id": article_data["id"],
                 "research_data": research_data,
                 "content": content_response.content[0].text,
+                "internal_links": formatted_links,
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -103,11 +144,14 @@ Please give your response in fluid spanish, 40% spartan tone, casual."""
         self,
         article_data: Dict,
         research_data: str,
-        tone_file: str
+        tone_file: str,
+        internal_links: List[str]
     ) -> str:
-        """
-        Construye el prompt para Claude manteniendo el tono y estilo existente
-        """
+        """Construye el prompt incluyendo enlaces internos"""
+        links_section = "\n".join([
+            f"- {link}" for link in internal_links
+        ])
+        
         return f"""Eres un escritor SEO experto que escribe exactamente con este tono y estilo:
 
 {tone_file}
@@ -118,6 +162,9 @@ Genera contenido en español siguiendo estrictamente estas reglas:
 3. Palabras clave secundarias: {', '.join(article_data['secondary_keywords'])}
 4. Datos de investigación: {research_data}
 
+Enlaces internos a incluir naturalmente en el contenido:
+{links_section}
+
 El contenido debe:
 - Tener 600 palabras mínimo
 - Mantener el tono especificado
@@ -126,6 +173,7 @@ El contenido debe:
 - Ser original y atractivo
 - Estar dirigido a hombres de 25-35 años
 - Tener un tono casual y 30% espartano
+- Incluir los enlaces internos de forma natural y relevante
 
 Estructura el contenido de forma natural y atractiva, usando los datos de investigación como base."""
 
@@ -155,16 +203,36 @@ Estructura el contenido de forma natural y atractiva, usando los datos de invest
             logger.error(f"Error procesando CSV {csv_file}: {str(e)}")
             return []
 
+    @retry(
+        stop=stop_after_attempt(BATCH_CONFIG["MAX_RETRIES"]),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    async def _call_perplexity_api(self, prompt: str) -> Optional[str]:
+        """Realiza llamada a la API de Perplexity con rate limiting"""
+        try:
+            await self.rate_limiter.acquire()  # Esperar si es necesario
+            
+            response = self.perplexity_client.chat.completions.create(
+                model="sonar-medium-online",
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error en llamada a Perplexity API: {str(e)}")
+            return None
+
     async def validate_api_access(self) -> bool:
         """Valida el acceso a las APIs"""
         try:
-            # Probar Perplexity
-            test_response = await self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+            test_response = self.perplexity_client.chat.completions.create(
+                model="sonar-medium-online",
                 messages=[{"role": "user", "content": "Test"}],
                 max_tokens=10
             )
             return bool(test_response)
         except Exception as e:
             logger.error(f"Error validando APIs: {str(e)}")
-            return False 
+            return False
