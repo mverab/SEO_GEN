@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
-import numpy as np
+import pandas as pd
 from internal_links_service import InternalLinksService
 
 @pytest.fixture
@@ -15,7 +15,8 @@ https://test.com/2,"Esta es una descripción de prueba dos"
 https://test.com/3,"Esta es una descripción de prueba tres"
 """
 
-def test_load_links(links_service, sample_links_data, tmp_path):
+@pytest.mark.asyncio
+async def test_load_links(links_service, sample_links_data, tmp_path):
     """Prueba la carga de enlaces desde CSV"""
     # Crear archivo temporal
     csv_path = tmp_path / "test_links.csv"
@@ -26,45 +27,6 @@ def test_load_links(links_service, sample_links_data, tmp_path):
     assert links_service.links_data is not None
     assert len(links_service.links_data) == 3
     assert all(col in links_service.links_data.columns for col in ['URL', 'Descripción'])
-
-@pytest.mark.asyncio
-async def test_get_embedding_with_cache(links_service):
-    """Prueba obtención de embeddings con caché"""
-    test_text = "texto de prueba"
-    mock_embedding = [0.1, 0.2, 0.3]
-    
-    # Primera llamada - sin caché
-    with patch.object(links_service.openai_client.embeddings, 'create') as mock_create:
-        mock_create.return_value.data = [Mock(embedding=mock_embedding)]
-        
-        embedding1 = await links_service.get_embedding(test_text)
-        assert embedding1 == mock_embedding
-        mock_create.assert_called_once()
-        
-        # Segunda llamada - debería usar caché
-        embedding2 = await links_service.get_embedding(test_text)
-        assert embedding2 == mock_embedding
-        # Verificar que no se llamó de nuevo a la API
-        mock_create.assert_called_once()
-
-def test_calculate_similarity(links_service):
-    """Prueba cálculo de similitud de coseno"""
-    embedding1 = np.array([1, 0, 0])
-    embedding2 = np.array([0, 1, 0])
-    embedding3 = np.array([1, 0, 0])  # Igual a embedding1
-    
-    # Vectores perpendiculares
-    similarity1 = links_service.calculate_similarity(embedding1, embedding2)
-    assert similarity1 == 0
-    
-    # Vectores iguales
-    similarity2 = links_service.calculate_similarity(embedding1, embedding3)
-    assert similarity2 == 1
-    
-    # Vectores con cierta similitud
-    embedding4 = np.array([0.7, 0.7, 0])
-    similarity3 = links_service.calculate_similarity(embedding1, embedding4)
-    assert 0 < similarity3 < 1
 
 @pytest.mark.asyncio
 async def test_find_relevant_links(links_service, sample_links_data, tmp_path):

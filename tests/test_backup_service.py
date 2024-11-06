@@ -1,30 +1,18 @@
 import pytest
 import os
-import json
-from datetime import datetime, timedelta
+from unittest.mock import Mock, patch
 from backup_service import BackupService
+from datetime import datetime, timedelta
+import json
 
 @pytest.fixture
-def backup_service():
+def backup_service(tmp_path):
     service = BackupService()
-    # Usar un directorio temporal para pruebas
-    service.backup_dir = "test_backups"
+    service.backup_dir = str(tmp_path)  # Usar directorio temporal para pruebas
     return service
 
-@pytest.fixture
-def cleanup():
-    yield
-    # Limpiar directorio de pruebas después de cada test
-    if os.path.exists("test_backups"):
-        for root, dirs, files in os.walk("test_backups", topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir("test_backups")
-
 @pytest.mark.asyncio
-async def test_save_backup(backup_service, cleanup):
+async def test_save_backup(backup_service):
     """Prueba guardado de respaldo individual"""
     content = "Test content"
     metadata = {
@@ -53,7 +41,7 @@ async def test_save_backup(backup_service, cleanup):
         assert saved_metadata == metadata
 
 @pytest.mark.asyncio
-async def test_save_batch_backup(backup_service, cleanup):
+async def test_save_batch_backup(backup_service):
     """Prueba guardado de respaldo en lote"""
     articles = {
         "test_1": {
@@ -78,7 +66,8 @@ async def test_save_batch_backup(backup_service, cleanup):
         assert os.path.exists(os.path.join(backup_path, f"{article_id}_content.md"))
         assert os.path.exists(os.path.join(backup_path, f"{article_id}_metadata.json"))
 
-def test_cleanup_old_backups(backup_service, cleanup):
+@pytest.mark.asyncio
+async def test_cleanup_old_backups(backup_service):
     """Prueba limpieza de respaldos antiguos"""
     # Crear respaldos con diferentes fechas
     dates = [
@@ -106,14 +95,14 @@ def test_cleanup_old_backups(backup_service, cleanup):
     old_date = dates[0].strftime('%Y%m%d')
     assert old_date not in remaining_dirs
 
-def test_ensure_backup_directory(backup_service, cleanup):
+def test_ensure_backup_directory(backup_service):
     """Prueba creación de directorio de respaldo"""
     assert not os.path.exists(backup_service.backup_dir)
     backup_service.ensure_backup_directory()
     assert os.path.exists(backup_service.backup_dir)
 
 @pytest.mark.asyncio
-async def test_save_backup_with_invalid_data(backup_service, cleanup):
+async def test_save_backup_with_invalid_data(backup_service):
     """Prueba manejo de errores en guardado"""
     result = await backup_service.save_backup(
         None,  # Contenido inválido
@@ -122,7 +111,7 @@ async def test_save_backup_with_invalid_data(backup_service, cleanup):
     )
     assert result is None
 
-def test_cleanup_with_invalid_dates(backup_service, cleanup):
+def test_cleanup_with_invalid_dates(backup_service):
     """Prueba limpieza con nombres de directorio inválidos"""
     # Crear directorios con nombres inválidos
     os.makedirs(os.path.join(backup_service.backup_dir, "invalid_date"), exist_ok=True)

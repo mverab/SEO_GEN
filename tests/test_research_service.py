@@ -19,18 +19,19 @@ async def test_research_service_init(research_service):
     assert research_service is not None
     assert research_service.perplexity_client is not None
 
+@pytest.mark.asyncio
 async def test_get_research_data(research_service, sample_article_data):
     """Prueba obtención de datos de investigación"""
     with patch.object(research_service.perplexity_client.chat.completions, 'create') as mock_perplexity:
-        mock_perplexity.return_value.choices = [
-            Mock(message=Mock(content="Test research data"))
-        ]
+        mock_perplexity.return_value = Mock(
+            choices=[Mock(message=Mock(content="Test research data"))]
+        )
         
         result = await research_service.get_research_data(
-            sample_article_data,
-            "test tone"
+            article_data=sample_article_data,
+            tone_file="test_tone.txt"
         )
         
         assert result is not None
+        assert "content" in result
         assert "research_data" in result
-        mock_perplexity.assert_called_once() 

@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import pandas as pd
 
 # Configuración para pruebas asíncronas
 @pytest.fixture(scope="session")
@@ -20,12 +21,30 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("FOLDER_ID", "test_folder")
 
 @pytest.fixture
+async def research_service():
+    """Fixture para PerplexityResearchService"""
+    return PerplexityResearchService(
+        api_key="test_key"  # Solo necesita una API key según la clase actual
+    )
+
+@pytest.fixture
 def sample_article_data():
-    """Datos de prueba para artículos"""
+    """Fixture para datos de prueba"""
     return {
         "id": "test_123",
         "title": "Test Title",
         "keyword": "test keyword",
         "secondary_keywords": ["kw1", "kw2"],
-        "perplexity_query": "Test query for research"
-    } 
+        "perplexity_query": "Test query"
+    }
+
+@pytest.fixture
+def sample_df():
+    """Fixture para DataFrame de prueba"""
+    return pd.DataFrame({
+        'id': [1, 2],
+        'title': ['Test 1', 'Test 2'],
+        'keyword': ['kw1', 'kw2'],
+        'secondary_keywords': ['sk1, sk2', 'sk3, sk4'],
+        'PerplexityQuery': ['Query 1', 'Query 2']
+    })

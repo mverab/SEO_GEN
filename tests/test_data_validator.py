@@ -1,22 +1,8 @@
 import pytest
-from unittest.mock import Mock, patch
 import pandas as pd
 from data_validator import DataValidator
-import os
 
-pytestmark = pytest.mark.asyncio
-
-@pytest.fixture
-def validator():
-    return DataValidator()
-
-@pytest.fixture
-def sample_csv_data():
-    return """title,keyword,secondary_keywords,PerplexityQuery
-Test Article,test keyword,"kw1, kw2, kw3",What is test keyword?
-Another Test,another keyword,"kw4, kw5, kw6",Tell me about another keyword
-"""
-
+@pytest.mark.asyncio
 async def test_validate_csv_structure(validator, sample_csv_data, tmp_path):
     """Prueba validación de estructura del CSV"""
     csv_path = tmp_path / "test.csv"
@@ -25,6 +11,7 @@ async def test_validate_csv_structure(validator, sample_csv_data, tmp_path):
     df = pd.read_csv(csv_path)
     assert validator.validate_csv_structure(df) == True
 
+@pytest.mark.asyncio
 async def test_validate_row_valid(validator):
     """Prueba validación de fila válida"""
     row = pd.Series({
@@ -38,6 +25,7 @@ async def test_validate_row_valid(validator):
     assert is_valid == True
     assert len(errors) == 0
 
+@pytest.mark.asyncio
 async def test_validate_csv_complete(validator, sample_csv_data, tmp_path):
     """Prueba validación completa de CSV"""
     csv_path = tmp_path / "test.csv"
