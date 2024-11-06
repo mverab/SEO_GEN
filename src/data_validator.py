@@ -108,3 +108,12 @@ class DataValidator:
                         f.write(f"- {error}\n")
                         
         logger.info(f"Reporte de validación generado: {report_file}") 
+
+def validate_article_data(article: dict) -> bool:
+    """Validación básica de datos de artículo"""
+    required_fields = ['id', 'title', 'keyword', 'PerplexityQuery']
+    
+    return all(
+        article.get(field) and len(str(article[field]).strip()) > 0 
+        for field in required_fields
+    )

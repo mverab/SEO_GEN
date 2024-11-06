@@ -1,69 +1,82 @@
+import os
+from dotenv import load_dotenv
 import asyncio
-import logging
+import aiohttp
 import pandas as pd
-from research_service import PerplexityResearchService
-from batch_processor import ArticleBatchProcessor
-from google_docs_service import GoogleDocsService
-from config import PERPLEXITY_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
+from datetime import datetime
+import ssl
+import certifi
+import json
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-async def process_batch():
-    """Procesa el lote de artículos"""
-    try:
-        # Usar ruta predefinida
-        csv_file = "data/input/test_articles.csv"
+async def test_perplexity():
+    """Prueba rápida de integración"""
+    load_dotenv(override=True)
+    
+    api_key = os.getenv('PERPLEXITY_API_KEY')
+    print(f"API Key cargada: {api_key[:10]}...")
+    
+    if not api_key.startswith('pplx-'):
+        raise ValueError("API key inválida - debe empezar con 'pplx-'")
+    
+    df = pd.read_csv('data/input/test_articles.csv')
+    test_row = df.iloc[0]
+    
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'accept': 'application/json',
+            'content-type': 'application/json'
+        }
         
-        processor = ArticleBatchProcessor(
-            perplexity_api_key=PERPLEXITY_API_KEY,
-            anthropic_api_key=ANTHROPIC_API_KEY,
-            openai_api_key=OPENAI_API_KEY
-        )
+        data = {
+            "model": "llama-3.1-sonar-small-128k-online",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Eres un experto en bienes raíces escribiendo en español."
+                },
+                {
+                    "role": "user",
+                    "content": test_row['PerplexityQuery']
+                }
+            ]
+        }
         
-        await processor.add_to_queue(pd.read_csv(csv_file))
-        await processor.process_batch()
-        
-        return processor.results
-        
-    except Exception as e:
-        logger.error(f"Error en procesamiento por lotes: {str(e)}")
-        return None
-
-async def main():
-    try:
-        # Inicializar servicios
-        research_service = PerplexityResearchService(
-            perplexity_api_key=PERPLEXITY_API_KEY,
-            anthropic_api_key=ANTHROPIC_API_KEY,
-            openai_api_key=OPENAI_API_KEY
-        )
-        
-        # Verificar acceso a APIs
-        if not await research_service.validate_api_access():
-            logger.error("Error validando acceso a APIs")
-            return
+        try:
+            print("Enviando solicitud...")
+            print("URL:", "https://api.perplexity.ai/chat/completions")
+            print("Headers:", json.dumps(headers, indent=2))
+            print("Data:", json.dumps(data, indent=2))
             
-        # Procesar directamente en modo batch
-        results = await process_batch()
-        
-        if results:
-            logger.info("Procesamiento por lotes completado")
-            # Guardar en Google Docs
-            docs_service = GoogleDocsService()
-            doc_ids = await docs_service.save_batch(results)
-            
-            if doc_ids:
-                logger.info("Documentos guardados:")
-                for article_id, doc_id in doc_ids.items():
-                    logger.info(f"- {article_id}: https://docs.google.com/document/d/{doc_id}/edit")
-            else:
-                logger.error("Error al guardar en Google Docs")
-        else:
-            logger.error("Error en procesamiento por lotes")
+            async with session.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers=headers,
+                json=data
+            ) as response:
+                print(f"Status Code: {response.status}")
+                response_text = await response.text()
+                print(f"Response: {response_text}")
                 
-    except Exception as e:
-        logger.error(f"Error en ejecución: {str(e)}")
+                if response.status == 200:
+                    result = await response.json()
+                    
+                    # Guardar resultado
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"test_article_{timestamp}.txt"
+                    
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        f.write(f"# {test_row['title']}\n\n")
+                        f.write(f"Keyword: {test_row['keyword']}\n\n")
+                        f.write(result['choices'][0]['message']['content'])
+                    
+                    print(f"✅ Artículo generado en {filename}")
+                else:
+                    print(f"❌ Error: {response_text}")
+                    
+        except Exception as e:
+            print(f"❌ Error detallado: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_perplexity())
