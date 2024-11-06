@@ -37,6 +37,7 @@ class BatchResearchProcessor:
                     "title": row['title'],
                     "keyword": row['keyword'],
                     "secondary_keywords": row['secondary_keywords'].split(','),
+                    "perplexity_query": row['PerplexityQuery'],
                     "status": "pending"
                 }
                 await self.queue.put(article_data)
@@ -56,15 +57,21 @@ class BatchResearchProcessor:
         try:
             logger.info(f"Iniciando investigación para artículo {article_data['id']}")
             
+            # Usar PerplexityQuery específica del CSV
+            perplexity_query = article_data.get("perplexity_query", "")
+            if not perplexity_query:
+                logger.warning(f"PerplexityQuery vacío para {article_data['id']}, usando query por defecto")
+                perplexity_query = self._build_default_query(
+                    article_data["keyword"],
+                    article_data["secondary_keywords"]
+                )
+
             # Obtener investigación de Perplexity
             research = await self.perplexity_client.chat.completions.create(
                 model="llama-3.1-sonar-large-128k-online",
                 messages=[{
                     "role": "user",
-                    "content": self._build_research_prompt(
-                        article_data["keyword"],
-                        article_data["secondary_keywords"]
-                    )
+                    "content": perplexity_query
                 }],
                 temperature=0.7,
                 search_recency_filter="month"

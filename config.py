@@ -15,10 +15,17 @@ FOLDER_ID = os.getenv("FOLDER_ID")
 
 # Configuración
 FEATURE_FLAGS = {
-    "USE_INTERNAL_LINKS": True,
+    "USE_INTERNAL_LINKS": False,
     "BACKUP_LOCAL": True,
     "DEBUG_MODE": False,
     "USE_PERPLEXITY": True
+}
+
+# Nuevo: Control de sitio
+SITE_CONFIG = {
+    "IS_NEW_SITE": True,
+    "SITE_LANGUAGE": "es",
+    "SITE_REGION": "Yucatan"
 }
 
 # Límites y configuración de batch

@@ -1,5 +1,5 @@
 Please search all relevant sources to give the most  accurate,  valuable and  concrete answer to the following question: 
-[ PLACE your question here ]
+[ PerplexityQuery]
 Additional instructions:  
 Use english written sources onlyplease
 Order your answer in the most SEO friendly way so it can be used to write a SEO article for  a website.

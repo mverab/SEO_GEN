@@ -8,7 +8,12 @@ logger = logging.getLogger(__name__)
 
 class DataValidator:
     def __init__(self):
-        self.required_columns = ['title', 'keyword', 'secondary_keywords']
+        self.required_columns = [
+            'title',
+            'keyword',
+            'secondary_keywords',
+            'PerplexityQuery'
+        ]
         self.validation_results = {
             "total": 0,
             "valid": 0,

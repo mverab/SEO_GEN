@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime
 import logging
 import anthropic
-from config import LOG_CONFIG, BATCH_CONFIG
+from config import LOG_CONFIG, BATCH_CONFIG, SITE_CONFIG
 import pandas as pd
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -45,15 +45,22 @@ class RateLimiter:
             self.calls.append(now)
 
 class PerplexityResearchService:
-    def __init__(self, perplexity_api_key: str, anthropic_api_key: str, openai_api_key: str):
-        """Inicializa el servicio de investigación"""
-        self.perplexity_client = OpenAI(
-            api_key=perplexity_api_key,
-            base_url="https://api.perplexity.ai"
-        )
-        self.anthropic_client = anthropic.Client(api_key=anthropic_api_key)
-        self.internal_links = InternalLinksService(openai_api_key)
-        self.rate_limiter = RateLimiter()
+    def __init__(self, api_key: str):
+        self.perplexity_client = OpenAI(api_key=api_key)
+        self.is_new_site = SITE_CONFIG["IS_NEW_SITE"]
+        
+    async def get_research_data(self, article_data: Dict) -> Optional[str]:
+        try:
+            # Si es sitio nuevo, omitir búsqueda de enlaces internos
+            if self.is_new_site:
+                logger.info("Sitio nuevo detectado - omitiendo enlaces internos")
+                return await self._get_research_only(article_data)
+            else:
+                return await self._get_research_with_links(article_data)
+                
+        except Exception as e:
+            logger.error(f"Error en investigación: {str(e)}")
+            return None
 
     def _build_perplexity_prompt(self, keyword: str, secondary_keywords: List[str]) -> str:
         """
