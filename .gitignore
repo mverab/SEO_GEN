@@ -1,5 +1,13 @@
-.env
+# Básico
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+*.log
+
+# Archivos de configuración
 credentials.json
 token.json
