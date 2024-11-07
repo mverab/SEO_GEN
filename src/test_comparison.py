@@ -62,39 +62,47 @@ Therefore, write this article in: {'Spanish' if any(c in row['title'].lower() fo
 
 You are the best professional expert on the market. You have the most accurate and detailed keywords about the real estate market and you are extremely informed about all developments in this niche.
 
-You write with a 40% spartan tone, casual, never too technical. You are specialized in writing for a young male audience (20-40 years old) with 6th grade reading level.
-
-Your style delivers extended paragraphs with extremely detailed information that are never boring, being casual, relatable and practical. You are famous for your slightly witty, yet charming tone.
-
 INSTRUCCIONES ESPECÍFICAS:
-1. Escribe un artículo completamente original, profundo e interesante.
-2. Título: {row['title']}
-3. Keyword principal: {row['keyword']}
-4. Keywords secundarias: {row['secondary_keywords']}
+1. Write a completely original, insightful, in-depth article.
+2. Title: {row['title']}
+3. Primary Keyword: {row['keyword']}
+4. Secondary Keywords: {row['secondary_keywords']}
 
-DATOS DE INVESTIGACIÓN (usar solo para datos históricos y periodísticos):
+RESEARCH DATA (use as main source of data like facts,values, prices, names, opinions, and all relevant information related to the topic):
 {perplexity_data}
 
-REQUISITOS SEO:
-- Longitud OBLIGATORIA: Mínimo 800 palabras, máximo 1100 palabras
-- Abusa de la coincidencia exacta de keywords con frases de búsqueda
-- Optimiza para intención de búsqueda semántica tipo JSON-LD
-- Incluir H2s y H3s enriquecidos (mínimo 4 H2 y 2 H3 por H2)
-- Contenido novedoso y enriquecedor con ejemplos específicos
-- Estilo cercano y humano
-- Formato web optimizado:
-  * Párrafos de 2-3 oraciones máximo
-  * Bullets para listas
-  * Datos duros y cifras cuando sea posible
-  * Ejemplos prácticos en cada sección
+SEO REQUIREMENTS:
+- MANDATORY LENGTH: Minimum 900 words, maximum 1100 words (strictly enforced)
+- Abuse exact keyword matches in strategic places:
+  * Title
+  * At least one H2 and one H3
+  * First paragraph
+  * Meta description
+  * Image alt text
+- Optimize for semantic search intent
+- Include rich H2s and H3s (minimum 4 H2s with 2 H3s each)
+- Novel and enriching content with specific examples
+- Engaging, human-like style
+- Web-optimized format:
+  * 2-3 sentence paragraphs maximum
+  * Bullet points for lists
+  * Hard data and figures when possible
+  * Practical examples in each section
+- Add html tags to the content to make it more readable and structured
+- Use html/css resources to make the content more engaging and interactive highlights or charts
 
-ESTRUCTURA OBLIGATORIA:
-- Introducción cautivadora (100-150 palabras)
-- 4-5 secciones principales con H2 (150-200 palabras cada una)
-- 2-3 subsecciones H3 por cada H2 (50-75 palabras cada una)
-- Conclusión con llamada a la acción (100 palabras)
+MANDATORY STRUCTURE:
+- Engaging introduction (120-150 words)
+- 6-7 main sections short parragraphs with H2 (180-200 words each)
+- 2-3 subsections H3 per H2 (60-75 words each)
+- Call-to-action conclusion avoiding using the word conclusions (100-120 words)
 
-El contenido debe ser extremadamente detallado y útil para el lector."""
+At the bottom, include:
+1. Meta description (150-160 characters)
+2. Image alt text suggestion
+3. SEO-friendly permalink
+
+Follow the tone and style from @tone.txt exactly."""
             
             completion = anthropic_client.messages.create(
                 model="claude-3-sonnet-20240229",
@@ -117,8 +125,96 @@ El contenido debe ser extremadamente detallado y útil para el lector."""
             logger.error(f"Error procesando {row['title']}: {str(e)}")
 
 async def main():
-    # Probar solo con el nuevo CSV y limitar a 3 artículos
-    await test_articles('PLAN SEO REAL ESTATE YUCATAN FASE 1 - Hoja 1.csv', num_articles=3)
+    csv_file = 'PLAN SEO REAL ESTATE YUCATAN FASE 1 - Hoja 1.csv'
+    
+    # Leer CSV y eliminar duplicados
+    df = pd.read_csv(csv_file)
+    df = df.drop_duplicates(subset=['title'])
+    
+    # Tomar los primeros 3 artículos
+    df_filtered = df.head(3).copy()
+    
+    logger.info(f"Probando {len(df_filtered)} artículos específicos:")
+    for title in df_filtered['title']:
+        logger.info(f"- {title}")
+    
+    for _, row in df_filtered.iterrows():
+        try:
+            perplexity_data = await get_perplexity_data(row['PerplexityQuery'])
+            logger.info(f"✓ Datos obtenidos para: {row['title']}")
+            
+            # Prompt mejorado con SEO GUIDELINES
+            prompt = f"""You are a News/SEO writer/developer & research expert that speaks and writes in fluent native level spanish and english. 
+You automatically detect the language of the title and keywords to write the entire article in that same language.
+
+LANGUAGE DETECTION:
+- Title language: {row['title']}
+- Main keyword language: {row['keyword']}
+Therefore, write this article in: {'Spanish' if any(c in row['title'].lower() for c in ['á','é','í','ó','ú','ñ']) else 'English'}
+
+You are the best professional expert on the market. You have the most accurate and detailed keywords about the real estate market and you are extremely informed about all developments in this niche.
+
+INSTRUCCIONES ESPECÍFICAS:
+1. Write a completely original, insightful, in-depth article.
+2. Title: {row['title']}
+3. Primary Keyword: {row['keyword']}
+4. Secondary Keywords: {row['secondary_keywords']}
+
+RESEARCH DATA (use as main source of data like facts,values, prices, names, opinions, and all relevant information related to the topic):
+{perplexity_data}
+
+SEO REQUIREMENTS:
+- MANDATORY LENGTH: Minimum 900 words, maximum 1100 words (strictly enforced)
+- Abuse exact keyword matches in strategic places:
+  * Title
+  * At least one H2 and one H3
+  * First paragraph
+  * Meta description
+  * Image alt text
+- Optimize for semantic search intent
+- Include rich H2s and H3s (minimum 4 H2s with 2 H3s each)
+- Novel and enriching content with specific examples
+- Engaging, human-like style
+- Web-optimized format:
+  * 2-3 sentence paragraphs maximum
+  * Bullet points for lists
+  * Hard data and figures when possible
+  * Practical examples in each section
+- Add html tags to the content to make it more readable and structured
+- Use html/css resources to make the content more engaging and interactive highlights or charts
+
+MANDATORY STRUCTURE:
+- Engaging introduction (120-150 words)
+- 6-7 main sections short parragraphs with H2 (180-200 words each)
+- 2-3 subsections H3 per H2 (60-75 words each)
+- Call-to-action conclusion avoiding using the word conclusions (100-120 words)
+
+At the bottom, include:
+1. Meta description (150-160 characters)
+2. Image alt text suggestion
+3. SEO-friendly permalink
+
+Follow the tone and style from @tone.txt exactly."""
+            
+            completion = anthropic_client.messages.create(
+                model="claude-3-sonnet-20240229",
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            content = completion.content[0].text
+            
+            # Guardar para comparación
+            output_dir = f"output/test_{os.path.splitext(os.path.basename(csv_file))[0]}"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            with open(f"{output_dir}/{row['title'].replace(' ', '_')}.txt", 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            logger.info(f"✓ Artículo completado: {row['title']}")
+            
+        except Exception as e:
+            logger.error(f"Error procesando {row['title']}: {str(e)}")
 
 if __name__ == "__main__":
     import asyncio
