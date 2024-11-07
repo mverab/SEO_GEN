@@ -1,27 +1,33 @@
 import os
 from dotenv import load_dotenv
+import aiohttp
+import asyncio
 
-def simple_content_check(content):
-    """
-    Verificación básica del contenido
-    """
-    if not content or len(content.strip()) < 10:
-        return False, "Contenido demasiado corto"
-    return True, "OK"
-
-def main():
+async def test_perplexity():
     load_dotenv()
     
-    # Configuración básica
-    content = input("Ingrese el contenido a verificar: ")
+    api_key = os.getenv('PERPLEXITY_API_KEY')
     
-    # Verificación simple
-    is_valid, message = simple_content_check(content)
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
     
-    if is_valid:
-        print("✅ Contenido válido")
-    else:
-        print(f"❌ Error: {message}")
+    data = {
+        "model": "llama-3.1-sonar-small-128k-online",
+        "messages": [{"role": "user", "content": "What are the main advantages of real estate investment in Yucatan, Mexico?"}]
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json=data
+        ) as response:
+            print(f"Status: {response.status}")
+            result = await response.json()
+            print("\nRespuesta:")
+            print(result['choices'][0]['message']['content'])
 
 if __name__ == "__main__":
-    main() 
+    asyncio.run(test_perplexity()) 

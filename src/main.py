@@ -1,82 +1,85 @@
 import os
+import logging
+from openai import OpenAI
 from dotenv import load_dotenv
-import asyncio
-import aiohttp
+from anthropic import Anthropic
 import pandas as pd
-from datetime import datetime
-import ssl
-import certifi
-import json
+from google_docs_service import GoogleDocsService
 
-async def test_perplexity():
-    """Prueba rápida de integración"""
-    load_dotenv(override=True)
-    
-    api_key = os.getenv('PERPLEXITY_API_KEY')
-    print(f"API Key cargada: {api_key[:10]}...")
-    
-    if not api_key.startswith('pplx-'):
-        raise ValueError("API key inválida - debe empezar con 'pplx-'")
-    
+# Configuración básica
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Inicializar clientes
+anthropic_client = Anthropic()
+perplexity_client = OpenAI(
+    api_key=os.getenv('PERPLEXITY_API_KEY'),
+    base_url="https://api.perplexity.ai"
+)
+google_docs = GoogleDocsService()
+
+async def get_perplexity_data(query: str) -> str:
+    """Obtener datos de Perplexity usando el cliente ya probado"""
+    try:
+        response = perplexity_client.chat.completions.create(
+            model="llama-3.1-sonar-small-128k-online",
+            messages=[{"role": "user", "content": query}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"Error Perplexity: {str(e)}")
+        raise
+
+async def main():
     df = pd.read_csv('data/input/test_articles.csv')
-    test_row = df.iloc[0]
+    logger.info(f"Procesando {len(df)} artículos...")
     
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'accept': 'application/json',
-            'content-type': 'application/json'
-        }
-        
-        data = {
-            "model": "llama-3.1-sonar-small-128k-online",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "Eres un experto en bienes raíces escribiendo en español."
-                },
-                {
-                    "role": "user",
-                    "content": test_row['PerplexityQuery']
-                }
-            ]
-        }
-        
+    for _, row in df.iterrows():
         try:
-            print("Enviando solicitud...")
-            print("URL:", "https://api.perplexity.ai/chat/completions")
-            print("Headers:", json.dumps(headers, indent=2))
-            print("Data:", json.dumps(data, indent=2))
+            perplexity_data = await get_perplexity_data(row['PerplexityQuery'])
+            logger.info(f"✓ Datos obtenidos para: {row['title']}")
             
-            async with session.post(
-                "https://api.perplexity.ai/chat/completions",
-                headers=headers,
-                json=data
-            ) as response:
-                print(f"Status Code: {response.status}")
-                response_text = await response.text()
-                print(f"Response: {response_text}")
-                
-                if response.status == 200:
-                    result = await response.json()
+            completion = anthropic_client.messages.create(
+                model="claude-3-sonnet-20240229",
+                max_tokens=4000,
+                messages=[{
+                    "role": "user",
+                    "content": f"""
+                    Título: {row['title']}
+                    Keyword: {row['keyword']}
+                    Keywords secundarias: {row['secondary_keywords']}
                     
-                    # Guardar resultado
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"test_article_{timestamp}.txt"
+                    Información de investigación:
+                    {perplexity_data}
                     
-                    with open(filename, 'w', encoding='utf-8') as f:
-                        f.write(f"# {test_row['title']}\n\n")
-                        f.write(f"Keyword: {test_row['keyword']}\n\n")
-                        f.write(result['choices'][0]['message']['content'])
-                    
-                    print(f"✅ Artículo generado en {filename}")
-                else:
-                    print(f"❌ Error: {response_text}")
-                    
+                    Genera un artículo SEO optimizado en español.
+                    """
+                }]
+            )
+            
+            content = completion.content[0].text
+            
+            # Guardar en Google Docs
+            doc_id = await google_docs.save_content(
+                content=content,
+                title=row['title'],
+                article_id=str(pd.Timestamp.now().strftime('%Y%m%d_%H%M%S'))
+            )
+            
+            if doc_id:
+                logger.info(f"✓ Artículo guardado en Google Docs: {doc_id}")
+            
+            # Mantener backup local
+            os.makedirs('output', exist_ok=True)
+            with open(f"output/{row['title'].replace(' ', '_')}.txt", 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            logger.info(f"✓ Artículo completado: {row['title']}")
+            
         except Exception as e:
-            print(f"❌ Error detallado: {str(e)}")
+            logger.error(f"Error procesando {row['title']}: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(test_perplexity())
+    import asyncio
+    asyncio.run(main())
