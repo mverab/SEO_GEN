@@ -27,7 +27,10 @@ async def get_perplexity_data(query: str) -> str:
     try:
         response = perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-small-128k-online",
-            messages=[{"role": "user", "content": query}]
+            messages=[{"role": "user", "content": query}],
+            temperature=0.2,  # Menor temperatura para respuestas más precisas
+            top_p=0.9,       # Núcleo de muestreo para mejor coherencia
+            frequency_penalty=1  # Reduce repeticiones
         )
         return response.choices[0].message.content
     except Exception as e:

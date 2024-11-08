@@ -25,18 +25,13 @@ link_service = InternalLinkService(openai_client)
 async def get_perplexity_data(query: str) -> str:
     """Obtener datos de Perplexity usando el cliente ya probado"""
     try:
-        # Asegurar que la query sea un string válido y esté formateada correctamente
-        formatted_query = {
-            "model": "llama-3.1-sonar-small-128k-online",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": str(query).strip()  # Asegurar que sea string y eliminar espacios extra
-                }
-            ]
-        }
-        
-        response = perplexity_client.chat.completions.create(**formatted_query)
+        response = perplexity_client.chat.completions.create(
+            model="llama-3.1-sonar-small-128k-online",
+            messages=[{"role": "user", "content": query}],
+            temperature=0.2,  # Menor temperatura para respuestas más precisas
+            top_p=0.9,       # Núcleo de muestreo para mejor coherencia
+            frequency_penalty=1  # Reduce repeticiones
+        )
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error Perplexity: {str(e)}")
