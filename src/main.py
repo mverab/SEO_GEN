@@ -6,6 +6,8 @@ from anthropic import Anthropic
 import pandas as pd
 from google_docs_service import GoogleDocsService
 from link_service import InternalLinkService
+import asyncio
+from datetime import datetime
 
 # Configuración básica
 load_dotenv()
@@ -22,15 +24,36 @@ google_docs = GoogleDocsService()
 openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 link_service = InternalLinkService(openai_client)
 
+class RateLimiter:
+    def __init__(self, calls_per_minute: int = 20):
+        self.calls_per_minute = calls_per_minute
+        self.calls = []
+        self.lock = asyncio.Lock()
+        
+    async def acquire(self):
+        async with self.lock:
+            now = datetime.now()
+            self.calls = [call_time for call_time in self.calls 
+                         if (now - call_time).seconds < 60]
+            
+            if len(self.calls) >= self.calls_per_minute:
+                wait_time = 60 - (now - self.calls[0]).seconds
+                if wait_time > 0:
+                    logger.info(f"Rate limit alcanzado. Esperando {wait_time} segundos")
+                    await asyncio.sleep(wait_time)
+                self.calls = self.calls[1:]
+            
+            self.calls.append(now)
+
 async def get_perplexity_data(query: str) -> str:
     """Obtener datos de Perplexity usando el cliente ya probado"""
     try:
         response = perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-small-128k-online",
             messages=[{"role": "user", "content": query}],
-            temperature=0.2,  # Menor temperatura para respuestas más precisas
-            top_p=0.9,       # Núcleo de muestreo para mejor coherencia
-            frequency_penalty=1  # Reduce repeticiones
+            temperature=0.2,
+            top_p=0.9,
+            frequency_penalty=1
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -38,13 +61,21 @@ async def get_perplexity_data(query: str) -> str:
         raise
 
 async def main(links_file: str = None):
-    df = pd.read_csv('data/input/test_articles.csv')
-    logger.info(f"Procesando {len(df)} artículos...")
+    rate_limiter = RateLimiter(calls_per_minute=20)
     
-    for _, row in df.iterrows():
+    # Usar la misma estructura que test_comparison.py
+    df = pd.read_csv('PLAN SEO REAL ESTATE YUCATAN FASE 1 - Hoja 1.csv')
+    df = df.drop_duplicates(subset=['title'])
+    df_filtered = df.iloc[6:].copy()
+    
+    logger.info(f"Procesando {len(df_filtered)} artículos...")
+    
+    for _, row in df_filtered.iterrows():
         try:
-            # 1. Obtener datos de Perplexity
-            perplexity_data = await get_perplexity_data(row['PerplexityQuery'])
+            await rate_limiter.acquire()
+            # Asegurar que la query sea un string válido
+            query = str(row['PerplexityQuery']).strip()
+            perplexity_data = await get_perplexity_data(query)
             logger.info(f"✓ Datos obtenidos para: {row['title']}")
             
             # 2. Obtener enlaces relevantes (opcional)
