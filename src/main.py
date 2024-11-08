@@ -52,36 +52,55 @@ async def main(links_file: str = None):
                     logger.info(f"✓ Enlaces relevantes encontrados: {len(relevant_links)}")
             
             # 3. Generar contenido con Anthropic
-            prompt = f"""You are a News/SEO writer/developer & research expert that speaks and writes in fluent native level spanish. You develop the best blog post & web article pieces ranking on all search engines.
+            prompt = f"""You are a News/SEO writer/developer & research expert that speaks and writes in fluent native level spanish and english. 
+You automatically detect the language of the title and keywords to write the entire article in that same language.
 
-You write with a 40% spartan tone, casual, never too technical. You are specialized in writing for a young male audience (20-40 years old) with 6th grade reading level.
+LANGUAGE DETECTION:
+- Title language: {row['title']}
+- Main keyword language: {row['keyword']}
+Therefore, write this article in: {'Spanish' if any(c in row['title'].lower() for c in ['á','é','í','ó','ú','ñ']) else 'English'}
 
-Your style delivers extended paragraphs with extremely detailed information that are never boring, being casual, relatable and practical. You are famous for your slightly witty, yet charming tone.
+You are the best professional expert on the market. You have the most accurate and detailed keywords about the real estate market and you are extremely informed about all developments in this niche.
 
 INSTRUCCIONES ESPECÍFICAS:
-1. Escribe un artículo completamente original, profundo, interesante y de alto valor.
-2. Título: {row['title']}
-3. Keyword principal: {row['keyword']}
-4. Keywords secundarias: {row['secondary_keywords']}
+1. Write a completely original, insightful, in-depth article.
+2. Title: {row['title']}
+3. Primary Keyword: {row['keyword']}
+4. Secondary Keywords: {row['secondary_keywords']}
 
-DATOS DE INVESTIGACIÓN:
+RESEARCH DATA (use as main source of data like facts,values, prices, names, opinions, and all relevant information related to the topic):
 {perplexity_data}
 
-REQUISITOS SEO:
-- Longitud: 850-1200 palabras
-- Usar coincidencia exacta de keywords donde sea natural
-- Optimizar para intención de búsqueda semántica
-- Incluir H2s y H3s enriquecidos
-- Contenido novedoso y enriquecedor
-- Estilo cercano y humano
-- Formato web optimizado (párrafos cortos, bullets cuando sea apropiado)
+SEO REQUIREMENTS:
+- MANDATORY LENGTH: Minimum 900 words, maximum 1100 words (strictly enforced)
+- Abuse exact keyword matches in strategic places:
+  * Title
+  * At least one H2 and one H3
+  * First paragraph
+  * Meta description
+  * Image alt text
+- Optimize for semantic search intent
+- Include rich H2s and H3s (minimum 4 H2s with 2 H3s each)
+- Novel and enriching content with specific examples
+- Engaging, human-like style
+- Web-optimized format:
+  * 2-3 sentence paragraphs maximum
+  * Bullet points for lists
+  * Hard data and figures when possible
+  * Practical examples in each section
+- Add html tags to the content to make it more readable and structured
+- Use html/css resources to make the content more engaging and interactive highlights or charts
 
-ESTRUCTURA:
-- Introducción cautivadora
-- Al menos 4 secciones principales con H2
-- Subsecciones relevantes con H3
-- Conclusión con llamada a la acción
-"""
+MANDATORY STRUCTURE:
+- Engaging introduction (120-150 words)
+- 6-7 main sections short parragraphs with H2 (180-200 words each)
+- 2-3 subsections H3 per H2 (60-75 words each)
+- Call-to-action conclusion avoiding using the word conclusions (100-120 words)
+
+At the bottom, include:
+1. Meta description (150-160 characters)
+2. Image alt text suggestion
+3. SEO-friendly permalink"""
             
             if relevant_links:
                 prompt += "\nENLACES A INTEGRAR ORGÁNICAMENTE:\n"

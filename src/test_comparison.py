@@ -124,17 +124,38 @@ Follow the tone and style from @tone.txt exactly."""
         except Exception as e:
             logger.error(f"Error procesando {row['title']}: {str(e)}")
 
+async def generate_with_gpt4(prompt: str) -> str:
+    """Generar contenido usando GPT-4-o-mini"""
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",  # Modelo correcto
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert SEO content writer specialized in real estate content."
+                },
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"Error GPT-4-o-mini: {str(e)}")
+        raise
+
 async def main():
     csv_file = 'PLAN SEO REAL ESTATE YUCATAN FASE 1 - Hoja 1.csv'
     
     # Leer CSV y eliminar duplicados
     df = pd.read_csv(csv_file)
     df = df.drop_duplicates(subset=['title'])
+    # Tomar los siguientes 3 artículos (skip primeros 3)
+    df_filtered = df.iloc[3:6].copy()
     
-    # Tomar los primeros 3 artículos
-    df_filtered = df.head(3).copy()
-    
-    logger.info(f"Probando {len(df_filtered)} artículos específicos:")
+    logger.info(f"Probando {len(df_filtered)} artículos con ambos modelos:")
     for title in df_filtered['title']:
         logger.info(f"- {title}")
     
@@ -143,7 +164,7 @@ async def main():
             perplexity_data = await get_perplexity_data(row['PerplexityQuery'])
             logger.info(f"✓ Datos obtenidos para: {row['title']}")
             
-            # Prompt mejorado con SEO GUIDELINES
+            # El prompt se mantiene igual
             prompt = f"""You are a News/SEO writer/developer & research expert that speaks and writes in fluent native level spanish and english. 
 You automatically detect the language of the title and keywords to write the entire article in that same language.
 
@@ -196,22 +217,31 @@ At the bottom, include:
 
 Follow the tone and style from @tone.txt exactly."""
             
-            completion = anthropic_client.messages.create(
+            # 1. Generar con Claude
+            completion_claude = anthropic_client.messages.create(
                 model="claude-3-sonnet-20240229",
                 max_tokens=4000,
                 messages=[{"role": "user", "content": prompt}]
             )
+            content_claude = completion_claude.content[0].text
             
-            content = completion.content[0].text
+            # 2. Generar con GPT-4o-mini
+            content_gpt4 = await generate_with_gpt4(prompt)
             
-            # Guardar para comparación
-            output_dir = f"output/test_{os.path.splitext(os.path.basename(csv_file))[0]}"
-            os.makedirs(output_dir, exist_ok=True)
+            # Guardar con nombres distintivos
+            # Claude
+            output_dir_claude = f"output/claude_sonnet"
+            os.makedirs(output_dir_claude, exist_ok=True)
+            with open(f"{output_dir_claude}/{row['title'].replace(' ', '_')}_sonnet.txt", 'w', encoding='utf-8') as f:
+                f.write(content_claude)
             
-            with open(f"{output_dir}/{row['title'].replace(' ', '_')}.txt", 'w', encoding='utf-8') as f:
-                f.write(content)
+            # GPT-4o-mini
+            output_dir_gpt4 = f"output/gpt4_omini"
+            os.makedirs(output_dir_gpt4, exist_ok=True)
+            with open(f"{output_dir_gpt4}/{row['title'].replace(' ', '_')}_omini.txt", 'w', encoding='utf-8') as f:
+                f.write(content_gpt4)
             
-            logger.info(f"✓ Artículo completado: {row['title']}")
+            logger.info(f"✓ Artículo completado con ambos modelos: {row['title']}")
             
         except Exception as e:
             logger.error(f"Error procesando {row['title']}: {str(e)}")
