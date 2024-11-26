@@ -94,7 +94,7 @@ LANGUAGE DETECTION:
 - Main keyword language: {row['keyword']}
 Therefore, write this article in: {'Spanish' if any(c in row['title'].lower() for c in ['á','é','í','ó','ú','ñ']) else 'English'}
 
-You are the best professional expert on the market. You have the most accurate and detailed keywords about the real estate market and you are extremely informed about all developments in this niche.
+You are a SEO expert who writes the best articles on any niche.
 
 INSTRUCCIONES ESPECÍFICAS:
 1. Write a completely original, insightful, in-depth article.
