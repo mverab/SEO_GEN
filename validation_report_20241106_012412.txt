@@ -1,6 +1,0 @@
-=== Reporte de Validación ===
-
-Total de filas: 2
-Filas válidas: 2
-Filas inválidas: 0
-
