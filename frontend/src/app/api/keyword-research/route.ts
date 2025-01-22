@@ -36,6 +36,23 @@ export async function POST(request: Request) {
           description: "Tipo de intención de búsqueda",
         },
       ],
+      suggestions: [
+        {
+          keyword: `${keyword} para principiantes`,
+          relevance: 85,
+          competition: "Baja"
+        },
+        {
+          keyword: `mejores ${keyword}`,
+          relevance: 75,
+          competition: "Media"
+        },
+        {
+          keyword: `${keyword} avanzado`,
+          relevance: 65,
+          competition: "Alta"
+        },
+      ],
     }
 
     return NextResponse.json(mockResponse)

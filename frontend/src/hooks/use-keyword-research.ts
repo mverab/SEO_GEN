@@ -5,7 +5,7 @@ import type { KeywordResearchResponse } from "@/types/api"
 
 export function useKeywordResearch() {
   return useMutation<KeywordResearchResponse, Error, string>({
-    mutationFn: async (keyword: string) => {
+    mutationFn: async (keyword: string): Promise<KeywordResearchResponse> => {
       const response = await fetch("/api/keyword-research", {
         method: "POST",
         headers: {
@@ -22,6 +22,10 @@ export function useKeywordResearch() {
       
       // Aseguramos que los datos sean serializables
       return {
+        suggestions: data.suggestions.map((suggestion: any) => ({
+          id: String(suggestion.id),
+          label: String(suggestion.label),
+        })),
         topic_map: data.topic_map.map((topic: any) => ({
           id: String(topic.id),
           label: String(topic.label),

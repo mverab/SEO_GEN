@@ -3,6 +3,7 @@
 import { KeywordSearchBar } from "../../components/keyword/search-bar"
 import { TopicMapVisualizer } from "../../components/keyword/topic-map"
 import { SEOMetricsDisplay } from "../../components/keyword/metrics"
+import { KeywordSuggestions } from "../../components/keyword/suggestions"
 import type { KeywordResearchResponse } from "../../types/api"
 import { useState } from "react"
 
@@ -13,6 +14,11 @@ export default function KeywordResearchPage() {
   const handleSuccess = (newData: KeywordResearchResponse) => {
     setData(newData)
     setIsFirstLoad(false)
+  }
+
+  const handleSuggestionSelect = (keyword: string) => {
+    // TODO: Implementar lógica para buscar la keyword sugerida
+    console.log("Keyword seleccionada:", keyword)
   }
 
   return (
@@ -30,6 +36,12 @@ export default function KeywordResearchPage() {
         <SEOMetricsDisplay metrics={data?.seo_potential} isFirstLoad={isFirstLoad} />
         <TopicMapVisualizer topics={data?.topic_map} isFirstLoad={isFirstLoad} />
       </div>
+
+      <KeywordSuggestions 
+        suggestions={data?.suggestions} 
+        onSelect={handleSuggestionSelect}
+        isFirstLoad={isFirstLoad}
+      />
     </div>
   )
 } 
