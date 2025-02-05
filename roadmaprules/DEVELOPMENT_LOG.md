@@ -1,44 +1,77 @@
 # Registro de Desarrollo SEO Generator
 
-## Versión 0.3.0 - Recursos y Contenido Dinámico
+## Versión 0.3.2 - Optimización de Validación
 
 ### Nuevas Características
-- Sistema de recursos por nicho
-- Contenido dinámico con Jina AI
-- Formatos múltiples (Markdown, HTML, WordPress)
-- Integración con sitios web de referencia
+- Sistema de caché para resultados de análisis
+- Soporte multilenguaje (ES/EN)
+- Métricas expandidas de calidad
+- Dashboard de análisis histórico
 
 ### Componentes Principales
-- ResourceService para gestión de recursos
-- DynamicContentService con Jina AI
-- Endpoints para recursos y contenido
-- Sistema de referencias automáticas
+- CacheService para resultados
+- MultiLanguageValidator
+- MetricsAggregator
+- HistoricalAnalytics
 
 ### Tareas Completadas
-- [x] Implementar sistema de recursos
-- [x] Crear servicio de contenido dinámico
-- [x] Integrar Jina AI para referencias
-- [x] Agregar soporte multi-formato
+- [x] Implementar sistema de caché Redis
+- [x] Agregar soporte para inglés
+- [x] Expandir métricas de análisis
+- [x] Crear dashboard histórico
 
 ### Próximos Pasos
-- [ ] Mejorar sistema de caché
-- [ ] Agregar más formatos de exportación
-- [ ] Implementar límites de uso
-- [ ] Optimizar rendimiento
+- [ ] Implementar análisis de estilo
+- [ ] Agregar más idiomas
+- [ ] Mejorar precisión de detección
+- [ ] Optimizar rendimiento de caché
 
 ### Notas de Implementación
-- Se requiere JINA_API_KEY
-- Sistema de recursos usa almacenamiento local
-- Contenido dinámico limitado a 3 referencias
-- Formatos soportados: markdown, html, wordpress
+- Caché con TTL de 24 horas
+- Detección automática de idioma
+- Nuevas métricas: estilo, tono, coherencia
+- Análisis histórico por proyecto
 
 ### Problemas Conocidos
-- Límites de rate en API de Jina
-- Sin persistencia distribuida de recursos
-- Formatos limitados de contenido
+- Latencia en caché distribuido
+- Precisión variable entre idiomas
+- Alto uso de memoria en análisis
+- Límites de API en producción
 
-### Registro de Cambios
-- 2024-02-05: Creación de estructura básica
-- 2024-02-06: Mejora de servicios simulados
-- 2024-02-07: Implementación de servicio de keywords
-- 2024-02-08: Agregado sistema de recursos y contenido dinámico
+## Versión 0.3.1 - Integración VeritasAPI
+
+### Nuevas Características
+- Sistema de detección de contenido AI
+- Humanización automática de textos
+- Métricas de calidad en tiempo real
+- UI para visualización de métricas
+
+### Componentes Principales
+- VeritasValidator para análisis de contenido
+- Integración con SingleArticleService
+- Componente AIMetrics en frontend
+- Sistema de mejora automática
+
+### Tareas Completadas
+- [x] Implementar VeritasAPI con FastAPI
+- [x] Integrar validación en flujo de contenido
+- [x] Crear componentes UI para métricas
+- [x] Agregar humanización automática
+
+### Próximos Pasos
+- [ ] Entrenar modelo de detección propio
+- [ ] Expandir características analizadas
+- [ ] Mejorar algoritmo de humanización
+- [ ] Agregar más métricas de calidad
+
+### Notas de Implementación
+- API simula análisis por ahora
+- Frontend muestra métricas en tiempo real
+- Sistema preparado para modelo real
+- Integración transparente con flujo existente
+
+### Problemas Conocidos
+- Simulación temporal de análisis
+- Sin persistencia de métricas
+- Limitado a español por ahora
+- Sin caché de resultados

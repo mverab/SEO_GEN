@@ -2,18 +2,30 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import logging
+from fastapi.middleware.cors import CORSMiddleware
 from keyword_research_service import KeywordResearchService
-from content_planner_service import ContentPlannerService
+from content_planner_service import ContentPlanService
 from resource_service import ResourceService
 from dynamic_content_service import DynamicContentService
 from fastapi.responses import PlainTextResponse
 
-# Configuración de la API
-app = FastAPI(title="SEO Content Generator")
+# Inicializar servicios
 keyword_research_service = KeywordResearchService()
-content_planner_service = ContentPlannerService()
+content_planner_service = ContentPlanService()
 resource_service = ResourceService()
 dynamic_content_service = DynamicContentService()
+
+# Configuración de la API
+app = FastAPI(title="SEO Content Generator")
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Modelos de datos
 class KeywordRequest(BaseModel):
@@ -33,6 +45,9 @@ class DynamicContentRequest(BaseModel):
     content: str
     format: str = "markdown"
     reference_urls: Optional[List[str]] = None
+
+class ContentPlanRequest(BaseModel):
+    keywords: List[str]
 
 # Endpoints de recursos
 @app.post("/resources/add")
@@ -130,6 +145,15 @@ async def export_plan_csv(request: KeywordList):
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/content-plan/generate")
+def generate_content_plan(request: ContentPlanRequest):
+    """Genera un plan de contenido"""
+    try:
+        plan = content_planner_service.generate_content_plan(request.keywords)
+        return plan
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():

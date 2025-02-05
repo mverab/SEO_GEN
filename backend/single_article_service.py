@@ -4,6 +4,7 @@ from perplexity_service import PerplexityService
 from internal_links_service import InternalLinksService
 from sitemap_service import SitemapService
 from research_service import ResearchService
+from .seo_gen_http import validate_and_improve_article
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +48,22 @@ class SingleArticleService:
                 related_content=related_content
             )
             
-            return {
+            # 5. Validar y mejorar con VeritasAPI
+            article_data = {
                 'keyword': keyword,
                 'content': article,
                 'internal_links': internal_links,
-                'related_content': related_content
+                'related_content': related_content,
+                'metadata': {
+                    'tone': tone,
+                    'word_count': word_count,
+                    'has_research': bool(research_data)
+                }
             }
+            
+            validated_article = await validate_and_improve_article(self, article_data)
+            
+            return validated_article
             
         except Exception as e:
             logger.error(f"Error generando artículo: {str(e)}")
@@ -68,11 +79,19 @@ class SingleArticleService:
             has_links = len(article.get('internal_links', [])) > 0
             has_research = bool(article.get('research_data'))
             
+            # Incluir métricas de VeritasAPI
+            ai_score = article.get('metadata', {}).get('ai_score', 1.0)
+            was_improved = article.get('metadata', {}).get('was_improved', False)
+            
             return {
                 'valid_length': word_count >= 500,
                 'has_internal_links': has_links,
                 'has_research': has_research,
-                'is_original': True  # Implementar verificación de originalidad
+                'is_original': ai_score < 0.4 or was_improved,
+                'ai_metrics': {
+                    'score': ai_score,
+                    'was_improved': was_improved
+                }
             }
             
         except Exception as e:

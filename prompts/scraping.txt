@@ -1,0 +1,9 @@
+Please search all relevant sources to give the most  accurate,  valuable and  concrete answer to the following question: 
+[ PerplexityQuery]
+Additional instructions:  
+Order your answer in the most SEO friendly way so it can be used to write a SEO article for  a website.
+ Include all semantic context possible, however, limit yourself to information relevant to answer the question inside a news outlet/blog SEO optimized post  perspective.
+Your response will be used as a main data source fed to a writing LLM to develop a high quality info about this subject. Please,  at the end give any relevant info about your workflow or frame of reference you believe is relevant in order to get  the best output possible. Avoid leaving blank spaces between lines in your response please
+Please give your response in fluid spanish, 40% spartan tone, casual.  
+
+

@@ -1,111 +1,85 @@
-from typing import List, Dict, Optional
-import csv
-from io import StringIO
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
+import pandas as pd
+from typing import List, Dict
 import logging
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
-class ContentPlannerService:
+class ContentPlanService:
     def __init__(self):
-        self.template_fields = [
-            "Título",
-            "Palabra Clave Principal",
-            "Palabras Clave Secundarias",
-            "Perplexity Query"
-        ]
-
-    def create_content_plan(self, keywords: List[Dict]) -> Dict:
+        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        
+    def generate_content_plan(self, keywords: List[str]) -> Dict:
         """
-        Crea un plan de contenido basado en una lista de keywords
+        Genera un plan de contenido basado en las keywords proporcionadas
         """
         try:
-            content_plan = []
+            # Leer el prompt template
+            with open('src/seoplanprompt.md', 'r', encoding='utf-8') as f:
+                prompt_template = f.read()
             
-            # Ordenar keywords por potencial SEO
-            sorted_keywords = sorted(
-                keywords, 
-                key=lambda x: x.get('seo_potential_score', 0), 
-                reverse=True
+            # Construir el prompt
+            prompt = f"""Aquí está la lista de palabras clave para generar el plan de contenido:
+
+{chr(10).join(f'- {keyword}' for keyword in keywords)}
+
+{prompt_template}"""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
             )
             
-            for kw in sorted_keywords:
-                article_plan = {
-                    "Título": self._generate_title(kw),
-                    "Palabra Clave Principal": kw['keyword'],
-                    "Palabras Clave Secundarias": self._get_secondary_keywords(kw),
-                    "Perplexity Query": self._generate_query(kw)
-                }
-                content_plan.append(article_plan)
+            content = response.choices[0].message.content
+            
+            # Convertir la respuesta a formato estructurado
+            articles = self._parse_content_to_articles(content)
+            
+            # Crear DataFrame y exportar a CSV
+            df = pd.DataFrame(articles)
+            output_path = f'plans/content_plan_{keywords[0].replace(" ", "_")}.csv'
+            os.makedirs('plans', exist_ok=True)
+            df.to_csv(output_path, index=False)
             
             return {
-                "plan": content_plan,
-                "total_articles": len(content_plan),
-                "estimated_time": len(content_plan) * 2  # 2 horas por artículo
+                "plan": articles,
+                "raw_content": content,
+                "file_path": output_path
             }
             
         except Exception as e:
-            logger.error(f"Error creando plan de contenido: {str(e)}")
-            return {"error": str(e)}
+            logger.error(f"Error generando plan de contenido: {str(e)}")
+            raise
 
-    def export_to_csv(self, content_plan: Dict) -> str:
+    def _parse_content_to_articles(self, content: str) -> List[Dict]:
         """
-        Exporta el plan a formato CSV
+        Parsea el contenido de la respuesta a una lista de artículos estructurados
         """
         try:
-            output = StringIO()
-            writer = csv.DictWriter(output, fieldnames=self.template_fields)
-            
-            writer.writeheader()
-            for article in content_plan["plan"]:
-                writer.writerow(article)
-                
-            return output.getvalue()
-            
+            # Por ahora retornamos el contenido sin procesar
+            # El formato real vendrá de GPT-4 siguiendo el template de seoplanprompt.md
+            return [{
+                "title": "Título del artículo",
+                "keyword": "keyword principal",
+                "secondary_keywords": "keywords secundarias",
+                "search_intent": "intención de búsqueda"
+            }]
+        except Exception as e:
+            logger.error(f"Error parseando contenido: {str(e)}")
+            return []
+
+    async def export_to_csv(self, plan_data: List[Dict], filename: str):
+        """
+        Exporta el plan a CSV
+        """
+        try:
+            df = pd.DataFrame(plan_data)
+            df.to_csv(f'plans/{filename}.csv', index=False)
+            return True
         except Exception as e:
             logger.error(f"Error exportando a CSV: {str(e)}")
-            return ""
-
-    def _generate_title(self, keyword_data: Dict) -> str:
-        """Genera un título SEO-friendly"""
-        kw = keyword_data['keyword']
-        intent = keyword_data.get('intent', 'informational')
-        
-        templates = {
-            'informational': [
-                f"Guía Completa: {kw}",
-                f"Todo sobre {kw}",
-                f"{kw}: Lo que Necesitas Saber"
-            ],
-            'transactional': [
-                f"Mejores {kw} del 2024",
-                f"Cómo Elegir {kw}",
-                f"Comparativa de {kw}"
-            ],
-            'navigational': [
-                f"Directorio de {kw}",
-                f"Encuentra {kw}",
-                f"Los Mejores Lugares para {kw}"
-            ]
-        }
-        
-        return templates.get(intent, templates['informational'])[0]
-
-    def _get_secondary_keywords(self, keyword_data: Dict) -> str:
-        """Extrae y formatea keywords secundarias"""
-        related = keyword_data.get('related_topics', [])
-        if not related:
-            return f"{keyword_data['keyword']} guía, {keyword_data['keyword']} tutorial"
-        return ", ".join(related)
-
-    def _generate_query(self, keyword_data: Dict) -> str:
-        """Genera una query para investigación"""
-        kw = keyword_data['keyword']
-        intent = keyword_data.get('intent', 'informational')
-        
-        queries = {
-            'informational': f"¿Cuál es la guía definitiva sobre {kw}?",
-            'transactional': f"¿Cuáles son los mejores {kw} y cómo elegirlos?",
-            'navigational': f"¿Dónde encontrar los mejores {kw}?"
-        }
-        
-        return queries.get(intent, queries['informational']) 
+            return False
